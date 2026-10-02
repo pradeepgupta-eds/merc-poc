@@ -323,3 +323,19 @@ main .section.highlight {
   margin: 0;
   padding: 40px 0;
 }
+
+/* eds-poc:migration-tokens:mercedes-benz-co-in:f7766d78 start */
+:root {
+  --body-font-size-m: 16px;
+  --heading-font-size-xxl: 32px;
+  --heading-font-size-xl: 24px;
+  --heading-font-size-l: 18.72px;
+  --heading-font-size-m: 32px;
+  --heading-font-size-s: 27.2px;
+  --heading-font-size-xs: 22.4px;
+  --nav-height: 64px;
+  --text-color: rgb(0, 0, 0);
+  --link-color: rgb(0, 0, 238);
+  --light-color: rgb(240, 240, 240);
+}
+/* eds-poc:migration-tokens:mercedes-benz-co-in:f7766d78 end */

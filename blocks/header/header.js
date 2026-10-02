@@ -11,6 +11,7 @@ const isDesktop = window.matchMedia('(min-width: 900px)');
 function closeOnEscape(e) {
   if (e.code === 'Escape') {
     const nav = document.getElementById('nav');
+    if (!nav) return;
     const navSections = nav.querySelector('.nav-sections');
     if (!navSections) return;
     const navSectionExpanded = navSections.querySelector('[aria-expanded="true"]');
@@ -20,8 +21,8 @@ function closeOnEscape(e) {
       navSectionExpanded.focus();
     } else if (!isDesktop.matches) {
       // eslint-disable-next-line no-use-before-define
-      toggleMenu(nav, navSections);
-      nav.querySelector('button').focus();
+      toggleMenu(nav, navSections, false);
+      nav.querySelector('.nav-hamburger button').focus();
     }
   }
 }
@@ -71,20 +72,28 @@ function toggleMenu(nav, navSections, forceExpanded = null) {
   // the desktop nav is always expanded, so aria-expanded only applies to the mobile menu
   if (isDesktop.matches) nav.removeAttribute('aria-expanded');
   else nav.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-  toggleAllNavSections(navSections, expanded || isDesktop.matches ? 'false' : 'true');
-  button.setAttribute('aria-label', expanded ? 'Open navigation' : 'Close navigation');
+  const open = !expanded && !isDesktop.matches;
+  button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  toggleAllNavSections(navSections, 'false');
+  button.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
 
   // enable menu collapse on escape keypress
   if (!expanded || isDesktop.matches) {
-    // collapse menu on escape press
     window.addEventListener('keydown', closeOnEscape);
-    // collapse menu on focus lost
     nav.addEventListener('focusout', closeOnFocusLost);
   } else {
     window.removeEventListener('keydown', closeOnEscape);
     nav.removeEventListener('focusout', closeOnFocusLost);
   }
 }
+
+const TOOL_ICONS = [
+  [/search/i, 'search'],
+  [/wish|favou?rite/i, 'wishlist'],
+  [/dealer|locat|find/i, 'locator'],
+  [/login|sign in/i, 'login'],
+  [/provider|imprint/i, 'provider'],
+];
 
 /**
  * loads and decorates the header, mainly the nav
@@ -93,13 +102,15 @@ function toggleMenu(nav, navSections, forceExpanded = null) {
 export default async function decorate(block) {
   // load nav as fragment
   const navMeta = getMetadata('nav');
-  const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
+  const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/header';
   const fragment = await loadFragment(navPath);
+  if (!fragment) return;
 
   // decorate nav DOM
   block.textContent = '';
   const nav = document.createElement('nav');
   nav.id = 'nav';
+  nav.setAttribute('aria-label', 'Main');
   while (fragment.firstElementChild) nav.append(fragment.firstElementChild);
 
   const classes = ['brand', 'sections', 'tools'];
@@ -109,14 +120,23 @@ export default async function decorate(block) {
   });
 
   const navBrand = nav.querySelector('.nav-brand');
-  const brandLink = navBrand.querySelector('.button');
-  if (brandLink) {
-    brandLink.className = '';
-    brandLink.closest('.button-container').className = '';
+  if (navBrand) {
+    const brandLink = navBrand.querySelector('.button');
+    if (brandLink) {
+      brandLink.className = '';
+      const container = brandLink.closest('.button-container');
+      if (container) container.className = '';
+    }
+    const logoLink = navBrand.querySelector('a');
+    if (logoLink) {
+      logoLink.classList.add('nav-logo');
+      if (!logoLink.getAttribute('aria-label')) logoLink.setAttribute('aria-label', logoLink.textContent.trim());
+    }
   }
 
   const navSections = nav.querySelector('.nav-sections');
   if (navSections) {
+    navSections.id = 'nav-sections';
     navSections.querySelectorAll(':scope .default-content-wrapper > ul > li').forEach((navSection) => {
       const subList = navSection.querySelector(':scope > ul');
       if (!subList) return;
@@ -137,13 +157,44 @@ export default async function decorate(block) {
         }
         button.setAttribute('aria-expanded', !expanded);
       });
+      navSection.addEventListener('mouseenter', () => {
+        if (isDesktop.matches) {
+          toggleAllNavSections(navSections);
+          button.setAttribute('aria-expanded', 'true');
+        }
+      });
+      navSection.addEventListener('mouseleave', () => {
+        if (isDesktop.matches) button.setAttribute('aria-expanded', 'false');
+      });
+    });
+  }
+
+  // tool links: icon classes and two-line login label
+  const navTools = nav.querySelector('.nav-tools');
+  if (navTools) {
+    navTools.querySelectorAll('li').forEach((li) => {
+      const link = li.querySelector('a');
+      if (!link) return;
+      const label = link.textContent.trim();
+      const match = TOOL_ICONS.find(([re]) => re.test(label));
+      if (match) li.classList.add(`nav-tool-${match[1]}`);
+      link.setAttribute('aria-label', label);
+      if (match && match[1] === 'login') {
+        const parts = label.match(/^(.*?)\s+(\S+)$/);
+        if (parts) {
+          link.innerHTML = '<span class="nav-login-avatar" aria-hidden="true"></span>'
+            + `<span class="nav-login-labels"><span>${parts[1]}</span><strong>${parts[2]}</strong></span>`;
+        }
+      } else if (match && match[1] === 'provider') {
+        link.textContent = 'Provider/…';
+      }
     });
   }
 
   // hamburger for mobile
   const hamburger = document.createElement('div');
   hamburger.classList.add('nav-hamburger');
-  hamburger.innerHTML = `<button type="button" aria-controls="nav" aria-label="Open navigation">
+  hamburger.innerHTML = `<button type="button" aria-controls="${navSections ? 'nav-sections' : 'nav'}" aria-expanded="false" aria-label="Open navigation">
       <span class="nav-hamburger-icon"></span>
     </button>`;
   hamburger.addEventListener('click', () => toggleMenu(nav, navSections));
